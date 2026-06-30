@@ -6,13 +6,16 @@ import {
   Body,
   Req,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { Request } from 'express';
 import { UsersService } from './users.service';
 import { UpdateProgressDto } from './dto/update-progress.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { UpdateAvatarDto } from './dto/update-avatar.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ChangeEmailDto } from './dto/change-email.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -46,10 +49,16 @@ export class UsersController {
   }
 
   @Patch('me/avatar')
-  @ApiOperation({ summary: 'Upload avatar (base64 JPEG, max 200KB)' })
-  updateAvatar(@Req() req: Request, @Body() dto: UpdateAvatarDto) {
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })
+  @ApiOperation({ summary: 'Upload avatar (multipart/form-data, field: file, max 5MB)' })
+  updateAvatar(@Req() req: Request, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowed.includes(file.mimetype)) throw new BadRequestException('Only JPEG/PNG/WebP/GIF allowed');
     const user = req.user as { id: string };
-    return this.users.updateAvatar(user.id, dto);
+    return this.users.updateAvatar(user.id, file);
   }
 
   @Delete('me/avatar')

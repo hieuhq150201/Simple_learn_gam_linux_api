@@ -5,10 +5,10 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import * as bcrypt from 'bcrypt';
 import { UpdateProgressDto } from './dto/update-progress.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { UpdateAvatarDto } from './dto/update-avatar.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ChangeEmailDto } from './dto/change-email.dto';
 
@@ -17,13 +17,16 @@ const PROFILE_SELECT = {
   email: true,
   displayName: true,
   bio: true,
-  avatarBase64: true,
+  avatarUrl: true,
   createdAt: true,
 } as const;
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cloudinary: CloudinaryService,
+  ) {}
 
   async getMe(userId: string) {
     return this.prisma.user.findUniqueOrThrow({
@@ -75,23 +78,20 @@ export class UsersService {
     });
   }
 
-  async updateAvatar(userId: string, dto: UpdateAvatarDto) {
-    const isDataUrl = dto.avatarBase64.startsWith('data:image/');
-    const isRawBase64 = /^[A-Za-z0-9+/=]+$/.test(dto.avatarBase64.slice(0, 100));
-    if (!isDataUrl && !isRawBase64) {
-      throw new BadRequestException('Invalid base64 image');
-    }
+  async updateAvatar(userId: string, file: Express.Multer.File): Promise<unknown> {
+    const url = await this.cloudinary.uploadAvatar(file, userId);
     return this.prisma.user.update({
       where: { id: userId },
-      data: { avatarBase64: dto.avatarBase64 },
+      data: { avatarUrl: url },
       select: PROFILE_SELECT,
     });
   }
 
-  async deleteAvatar(userId: string) {
+  async deleteAvatar(userId: string): Promise<unknown> {
+    await this.cloudinary.deleteAvatar(userId);
     return this.prisma.user.update({
       where: { id: userId },
-      data: { avatarBase64: null },
+      data: { avatarUrl: null },
       select: PROFILE_SELECT,
     });
   }

@@ -12,6 +12,9 @@ export const envSchema = z.object({
   MAIL_USER: z.string().email().optional(),
   MAIL_PASS: z.string().optional(),
   MAIL_FROM: z.string().optional().default('Hacker Path <noreply@hacklab.dev>'),
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -1,22 +1,30 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class MailService {
-  private transporter: nodemailer.Transporter;
+  private readonly logger = new Logger(MailService.name);
+  private transporter: nodemailer.Transporter | null = null;
 
   constructor(private config: ConfigService) {
-    this.transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: config.get<string>('MAIL_USER'),
-        pass: config.get<string>('MAIL_PASS'),
-      },
-    });
+    const user = config.get<string>('MAIL_USER');
+    const pass = config.get<string>('MAIL_PASS');
+    if (user && pass) {
+      this.transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user, pass },
+      });
+    } else {
+      this.logger.warn('MAIL_USER/MAIL_PASS not set — email sending disabled');
+    }
   }
 
   async sendPasswordReset(to: string, resetUrl: string): Promise<void> {
+    if (!this.transporter) {
+      this.logger.warn(`Email not sent to ${to} — mail not configured`);
+      return;
+    }
     const from = this.config.get<string>('MAIL_FROM');
     await this.transporter.sendMail({
       from,

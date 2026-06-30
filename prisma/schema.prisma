@@ -13,7 +13,7 @@ model User {
   passwordHash   String
   displayName    String?
   bio            String?
-  avatarBase64   String?
+  avatarUrl      String?
   createdAt      DateTime        @default(now())
   progress       Progress?
   refreshTokens  RefreshToken[]

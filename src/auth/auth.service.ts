@@ -50,12 +50,16 @@ export class AuthService {
   }
 
   async refresh(userId: string, rawRefreshToken: string, res: Response) {
-    const stored = await this.prisma.refreshToken.findFirst({
+    const tokens = await this.prisma.refreshToken.findMany({
       where: { userId, expiresAt: { gt: new Date() } },
     });
-    if (!stored || !(await bcrypt.compare(rawRefreshToken, stored.tokenHash))) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
+    const stored = await (async () => {
+      for (const t of tokens) {
+        if (await bcrypt.compare(rawRefreshToken, t.tokenHash)) return t;
+      }
+      return null;
+    })();
+    if (!stored) throw new UnauthorizedException('Invalid refresh token');
 
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
@@ -99,13 +103,20 @@ export class AuthService {
 
     const frontendUrl = this.config.get<string>('FRONTEND_URL')!;
     const resetUrl = `${frontendUrl}/reset-password?token=${rawToken}`;
-    await this.mailService.sendPasswordReset(email, resetUrl);
+    // Fire-and-forget — mail errors must NOT surface as 500 to client
+    this.mailService.sendPasswordReset(email, resetUrl).catch(() => {});
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
-    // Find non-expired, unused tokens and check each
     const records = await this.prisma.passwordReset.findMany({
-      where: { used: false, expiresAt: { gt: new Date() } },
+      where: {
+        used: false,
+        expiresAt: { gt: new Date() },
+        // Filter by tokenHash prefix is not possible with bcrypt, so limit scan
+        // to records created in last hour to bound the iteration set
+        createdAt: { gt: new Date(Date.now() - 60 * 60 * 1000) },
+      },
+      take: 50,
     });
 
     let matchedRecord: (typeof records)[0] | null = null;
