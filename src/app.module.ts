@@ -6,6 +6,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { MailModule } from './mail/mail.module';
 import { envSchema } from './common/config/env.schema';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -30,6 +31,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     PrismaModule,
     AuthModule,
     UsersModule,
+    MailModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionFilter }],
 })

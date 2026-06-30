@@ -2,11 +2,14 @@ import {
   Injectable,
   ConflictException,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { Response } from 'express';
@@ -19,6 +22,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwt: JwtService,
     private config: ConfigService,
+    private mailService: MailService,
   ) {}
 
   async register(dto: RegisterDto, res: Response) {
@@ -46,7 +50,6 @@ export class AuthService {
   }
 
   async refresh(userId: string, rawRefreshToken: string, res: Response) {
-    const tokenHash = await bcrypt.hash(rawRefreshToken, BCRYPT_ROUNDS);
     const stored = await this.prisma.refreshToken.findFirst({
       where: { userId, expiresAt: { gt: new Date() } },
     });
@@ -74,6 +77,63 @@ export class AuthService {
       }
     }
     this.clearCookies(res);
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) return; // silently ignore — prevent user enumeration
+
+    // Invalidate old tokens
+    await this.prisma.passwordReset.updateMany({
+      where: { userId: user.id, used: false },
+      data: { used: true },
+    });
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = await bcrypt.hash(rawToken, 10);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.prisma.passwordReset.create({
+      data: { tokenHash, userId: user.id, expiresAt },
+    });
+
+    const frontendUrl = this.config.get<string>('FRONTEND_URL')!;
+    const resetUrl = `${frontendUrl}/reset-password?token=${rawToken}`;
+    await this.mailService.sendPasswordReset(email, resetUrl);
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    // Find non-expired, unused tokens and check each
+    const records = await this.prisma.passwordReset.findMany({
+      where: { used: false, expiresAt: { gt: new Date() } },
+    });
+
+    let matchedRecord: (typeof records)[0] | null = null;
+    for (const record of records) {
+      const match = await bcrypt.compare(token, record.tokenHash);
+      if (match) {
+        matchedRecord = record;
+        break;
+      }
+    }
+
+    if (!matchedRecord) {
+      throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn');
+    }
+
+    const hash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await this.prisma.user.update({
+      where: { id: matchedRecord.userId },
+      data: { passwordHash: hash },
+    });
+
+    await this.prisma.passwordReset.update({
+      where: { id: matchedRecord.id },
+      data: { used: true },
+    });
+
+    // Revoke all refresh tokens to force re-login
+    await this.prisma.refreshToken.deleteMany({ where: { userId: matchedRecord.userId } });
   }
 
   private async issueTokens(user: { id: string; email: string }, res: Response) {

@@ -8,12 +8,16 @@ datasource db {
 }
 
 model User {
-  id            String         @id @default(uuid())
-  email         String         @unique
-  passwordHash  String
-  createdAt     DateTime       @default(now())
-  progress      Progress?
-  refreshTokens RefreshToken[]
+  id             String          @id @default(uuid())
+  email          String          @unique
+  passwordHash   String
+  displayName    String?
+  bio            String?
+  avatarBase64   String?
+  createdAt      DateTime        @default(now())
+  progress       Progress?
+  refreshTokens  RefreshToken[]
+  passwordResets PasswordReset[]
 }
 
 model Progress {
@@ -31,5 +35,15 @@ model RefreshToken {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model PasswordReset {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  used      Boolean  @default(false)
   createdAt DateTime @default(now())
 }
