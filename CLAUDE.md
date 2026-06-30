@@ -43,6 +43,21 @@ REST API cho Hacker Path learning platform. NestJS + TypeScript + PostgreSQL + P
 
 ---
 
+## Skills — dùng khi nào
+
+| Tình huống | Skill |
+|-----------|-------|
+| Viết feature / endpoint mới | `/superpowers:test-driven-development` hoặc `/tdd` — viết test trước |
+| Gặp bug hoặc test fail | `/superpowers:systematic-debugging` — không đoán mò |
+| Cần docs NestJS / Prisma / Passport | `/chub` — fetch docs mới nhất thay vì dùng memory |
+| Review code trước khi merge | `/code-review` |
+| Review security (auth, token, cookie) | `/security-review` |
+| Lên kế hoạch feature mới | `/superpowers:brainstorming` → `/superpowers:writing-plans` |
+| Sắp merge branch | `/superpowers:finishing-a-development-branch` |
+| Commit message | `/git-commit` |
+
+---
+
 ## Gates bắt buộc trước khi nói "xong"
 
 ```bash
