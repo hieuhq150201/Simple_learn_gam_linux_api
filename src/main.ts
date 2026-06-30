@@ -5,7 +5,6 @@ import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -28,7 +27,7 @@ async function bootstrap() {
     }),
   );
 
-  app.useGlobalFilters(app.get(HttpExceptionFilter));
+  // HttpExceptionFilter registered via APP_FILTER in AppModule
 
   // Swagger chỉ bật ở dev
   if (process.env['NODE_ENV'] !== 'production') {
