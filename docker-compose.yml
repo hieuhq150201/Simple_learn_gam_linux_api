@@ -1,0 +1,59 @@
+# Dev environment — app + postgres + pgAdmin
+# Dùng: docker compose up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: game-api-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gameapi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gameapi_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-game_api}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gameapi}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: game-api-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@local.dev
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - tools  # chỉ chạy khi cần: docker compose --profile tools up -d
+
+  app:
+    build:
+      context: .
+      target: builder  # dùng stage builder để có hot reload
+    container_name: game-api-app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gameapi}:${POSTGRES_PASSWORD:-gameapi_dev}@postgres:5432/${POSTGRES_DB:-game_api}
+      NODE_ENV: development
+    ports:
+      - "${PORT:-3001}:3001"
+    volumes:
+      - ./src:/app/src  # hot reload
+      - ./prisma:/app/prisma
+    command: npm run start:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
