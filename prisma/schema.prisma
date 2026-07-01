@@ -25,7 +25,12 @@ model Progress {
   userId            String   @unique
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   completedMissions Json     @default("{}")
-  stats             Json     @default("{\"commandsRun\":0,\"hintsUsed\":0}")
+  xp                Int      @default(0)
+  level             Int      @default(1)
+  currentStreak     Int      @default(0)
+  lastPlayDate      String   @default("")
+  commandsRun       Int      @default(0)
+  hintsUsed         Int      @default(0)
   updatedAt         DateTime @updatedAt
 }
 

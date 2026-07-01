@@ -1,18 +1,18 @@
-import { IsObject } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsObject, IsNumber, IsString, IsOptional, Min } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateProgressDto {
   @ApiProperty({
-    description: 'Map của mission đã hoàn thành',
-    example: { '1-1': { completedAt: 1234567890, usedHint: false } },
+    description: 'Map mission đã hoàn thành',
+    example: { '1-1': { completedAt: 1234567890, usedHint: false, stars: 3, xpEarned: 180 } },
   })
   @IsObject()
-  completedMissions!: Record<string, { completedAt: number; usedHint: boolean }>;
+  completedMissions!: Record<string, { completedAt: number; usedHint: boolean; stars?: number; xpEarned?: number }>;
 
-  @ApiProperty({
-    description: 'Stats tổng hợp',
-    example: { commandsRun: 42, hintsUsed: 3 },
-  })
-  @IsObject()
-  stats!: { commandsRun: number; hintsUsed: number };
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) xp?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(1) level?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) currentStreak?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() lastPlayDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) commandsRun?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) hintsUsed?: number;
 }

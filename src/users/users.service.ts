@@ -42,31 +42,31 @@ export class UsersService {
     const existing = await this.prisma.progress.findUnique({ where: { userId } });
 
     const mergedMissions = this.mergeMissions(
-      (existing?.completedMissions as Record<string, unknown>) ?? {},
+      (existing?.completedMissions as Record<string, { stars?: number; completedAt?: number }>) ?? {},
       dto.completedMissions,
     );
 
-    const existingStats = (existing?.stats as { commandsRun: number; hintsUsed: number }) ?? {
-      commandsRun: 0,
-      hintsUsed: 0,
-    };
+    // Recompute XP từ merged missions để tránh client gian lận
+    const recomputedXP: number = Object.values(mergedMissions).reduce(
+      (sum: number, m) => sum + (((m as { xpEarned?: number }).xpEarned) ?? 0),
+      0,
+    );
 
-    const mergedStats = {
-      commandsRun: Math.max(existingStats.commandsRun, dto.stats.commandsRun),
-      hintsUsed: Math.max(existingStats.hintsUsed, dto.stats.hintsUsed),
+    const data = {
+      completedMissions: mergedMissions as unknown as Prisma.JsonObject,
+      xp: recomputedXP,
+      level: Math.min(99, Math.floor(recomputedXP / 1000) + 1),
+      // Streak: server wins (time-based — không tin client)
+      currentStreak: existing?.currentStreak ?? dto.currentStreak ?? 0,
+      lastPlayDate: existing?.lastPlayDate ?? dto.lastPlayDate ?? '',
+      commandsRun: Math.max(existing?.commandsRun ?? 0, dto.commandsRun ?? 0),
+      hintsUsed: Math.max(existing?.hintsUsed ?? 0, dto.hintsUsed ?? 0),
     };
 
     return this.prisma.progress.upsert({
       where: { userId },
-      create: {
-        userId,
-        completedMissions: mergedMissions as unknown as Prisma.JsonObject,
-        stats: mergedStats as unknown as Prisma.JsonObject,
-      },
-      update: {
-        completedMissions: mergedMissions as unknown as Prisma.JsonObject,
-        stats: mergedStats as unknown as Prisma.JsonObject,
-      },
+      create: { userId, ...data },
+      update: data,
     });
   }
 
@@ -124,10 +124,21 @@ export class UsersService {
   }
 
   private mergeMissions(
-    server: Record<string, unknown>,
-    client: Record<string, unknown>,
+    server: Record<string, { stars?: number; completedAt?: number }>,
+    client: Record<string, { stars?: number; completedAt?: number }>,
   ): Record<string, unknown> {
-    // union: server thắng nếu cùng key (server là source of truth)
-    return { ...client, ...server };
+    const result: Record<string, unknown> = { ...server };
+    for (const [key, clientRecord] of Object.entries(client)) {
+      const serverRecord = server[key];
+      if (!serverRecord) {
+        result[key] = clientRecord;
+      } else {
+        // Giữ record có stars cao hơn; ngang thì giữ server
+        const clientStars = clientRecord.stars ?? 0;
+        const serverStars = serverRecord.stars ?? 0;
+        result[key] = clientStars > serverStars ? clientRecord : serverRecord;
+      }
+    }
+    return result;
   }
 }
